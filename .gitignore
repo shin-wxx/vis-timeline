@@ -9,6 +9,15 @@ npm-debug.log
 .project
 .settings/
 .directory
+.vscode/
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # temporary files
 .*.sw[op]
@@ -29,3 +38,38 @@ npm-debug.log
 /standalone/
 /styles/
 /vis-timeline-0.0.0-no-version.tgz
+.cache/
+
+# history files
+.history/
+
+# env and sensitive files (Critical)
+.env
+.env.test
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
+*.pfx2
+*.p12s
+
+# AI files
+.agent/
+.trae/
+.cursor/
+.claude/
+.openclaw/
+.codx/
+.hermes/
+.gemini/
+.anthropic/
+.openai/
+.openai-cache/
+.model-cache/
+.ollama/

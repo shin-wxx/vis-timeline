@@ -319,12 +319,23 @@ export type TimelineOptionsZoomKey =
   | "shiftKey"
   | "metaKey";
 
+export interface TimelineDataZoomOptions {
+  enabled?: boolean;
+  height?: number;
+  position?: "top" | "bottom";
+  showLabels?: boolean;
+  zoomOnScroll?: boolean;
+  filterData?: boolean;
+  handleWidth?: number;
+}
+
 export interface TimelineOptions {
   align?: TimelineAlignType;
   autoResize?: boolean;
   clickToUse?: boolean;
   cluster?: TimelineOptionsCluster;
   configure?: TimelineOptionsConfigureType;
+  dataZoom?: TimelineDataZoomOptions;
   dataAttributes?: TimelineOptionsDataAttributesType;
   editable?: TimelineOptionsEditableType;
   end?: DateType;

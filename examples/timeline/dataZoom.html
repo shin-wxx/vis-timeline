@@ -1,0 +1,276 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Timeline | DataZoom</title>
+
+    <style type="text/css">
+      body,
+      html {
+        font-family: sans-serif;
+      }
+      #controls {
+        margin: 10px 0;
+        padding: 8px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+      }
+      #controls label {
+        margin-right: 12px;
+      }
+      #status {
+        margin: 8px 0;
+        font-family: monospace;
+        font-size: 12px;
+        color: #555;
+        line-height: 1.5;
+      }
+      #rangePanel {
+        display: flex;
+        gap: 12px;
+        margin: 10px 0;
+      }
+      .range-card {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.8;
+      }
+      .range-card .range-title {
+        font-weight: bold;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+      }
+      .range-card .range-value {
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .range-timeline {
+        background: #e3f2fd;
+        border: 1px solid #90caf9;
+      }
+      .range-timeline .range-title {
+        color: #1565c0;
+      }
+      .range-datazoom {
+        background: #fff3e0;
+        border: 1px solid #ffcc80;
+      }
+      .range-datazoom .range-title {
+        color: #e65100;
+      }
+      .range-sub {
+        font-size: 11px;
+        color: #666;
+        margin-top: 2px;
+      }
+    </style>
+
+    <script src="../../standalone/umd/vis-timeline-graph2d.js"></script>
+    <link
+      href="../../styles/vis-timeline-graph2d.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+  </head>
+  <body>
+    <h2>Timeline · DataZoom 二次过滤</h2>
+    <p>
+      主时间轴可独立缩放/平移（滚轮/拖动时间轴）。dataZoom 导航条轨道代表
+      <b>当前可见窗口</b
+      >，其选窗是可见窗口内的<b>二次过滤区间</b>：拖动选窗/把手
+      只移动过滤区间（不移动时间轴），选区外的 item 被过滤。滚轮在 dataZoom 上
+      调整过滤选区。平移时间轴时过滤选区按比例跟随；缩小时选窗锚定到绝对时间不变；
+      放大到选窗内部时选窗自动修正为可见窗口。
+    </p>
+
+    <div id="controls">
+      <label
+        ><input type="checkbox" id="toggleFilter" checked /> filterData</label
+      >
+      <label
+        ><input type="checkbox" id="toggleScroll" checked /> zoomOnScroll</label
+      >
+      <label
+        ><input type="checkbox" id="toggleLabels" checked /> showLabels</label
+      >
+      <label>
+        position:
+        <select id="selPos">
+          <option value="bottom">bottom</option>
+          <option value="top">top</option>
+        </select>
+      </label>
+      <button id="btnReset">重置过滤</button>
+      <button id="btnDisable">禁用 dataZoom</button>
+      <button id="btnEnable">启用 dataZoom</button>
+    </div>
+
+    <div id="rangePanel">
+      <div class="range-card range-timeline">
+        <div class="range-title">Timeline 可见窗口</div>
+        <div class="range-value" id="rangeTimeline">-</div>
+        <div class="range-sub" id="rangeTimelineSub">跨度: -</div>
+      </div>
+      <div class="range-card range-datazoom">
+        <div class="range-title">DataZoom 选窗</div>
+        <div class="range-value" id="rangeDataZoom">-</div>
+        <div class="range-sub" id="rangeDataZoomSub">比例: [-] | 跨度: -</div>
+      </div>
+    </div>
+    <div id="status"></div>
+    <div id="visualization"></div>
+
+    <script type="text/javascript">
+      var container = document.getElementById("visualization");
+
+      // 生成横跨 2024 全年的 60 条数据
+      var items = new vis.DataSet();
+      var start = new Date("2024-01-01").getTime();
+      var end = new Date("2024-12-31").getTime();
+      for (var i = 0; i < 60; i++) {
+        var t = start + ((end - start) * i) / 59;
+        items.add({
+          id: i,
+          content: "item " + (i + 1),
+          start: new Date(t),
+          type: i % 5 === 0 ? "range" : "box",
+          end: i % 5 === 0 ? new Date(t + 5 * 24 * 3600 * 1000) : undefined,
+        });
+      }
+
+      var options = {
+        // min/max 仅作为时间轴的硬边界，dataZoom 不再直接使用它们
+        min: "2024-01-01",
+        max: "2024-12-31",
+        // 初始视窗（可见窗口）
+        start: "2024-04-01",
+        end: "2024-06-30",
+        height: "350px",
+        stack: true,
+        showCurrentTime: false,
+        zoomable: true,
+        moveable: true,
+        dataZoom: {
+          enabled: true,
+          height: 50,
+          position: "bottom",
+          showLabels: true,
+          zoomOnScroll: true,
+          filterData: true,
+          handleWidth: 8,
+        },
+      };
+
+      var timeline = new vis.Timeline(container, items, options);
+      var status = document.getElementById("status");
+      var rangeTimeline = document.getElementById("rangeTimeline");
+      var rangeTimelineSub = document.getElementById("rangeTimelineSub");
+      var rangeDataZoom = document.getElementById("rangeDataZoom");
+      var rangeDataZoomSub = document.getElementById("rangeDataZoomSub");
+
+      function fmt(d) {
+        return new Date(d).toISOString().slice(0, 16).replace("T", " ");
+      }
+
+      function fmtSpan(ms) {
+        if (ms < 60000) return (ms / 1000).toFixed(0) + " 秒";
+        if (ms < 3600000) return (ms / 60000).toFixed(0) + " 分钟";
+        if (ms < 86400000) return (ms / 3600000).toFixed(1) + " 小时";
+        if (ms < 2592000000) return (ms / 86400000).toFixed(1) + " 天";
+        if (ms < 31536000000) return (ms / 2592000000).toFixed(1) + " 个月";
+        return (ms / 31536000000).toFixed(2) + " 年";
+      }
+
+      function updateStatus() {
+        var win = timeline.getWindow();
+        var fr = timeline.dataZoom.getFilterRange();
+        var visible = items.get().filter(function (it) {
+          var s = new Date(it.start).getTime();
+          var e = it.end ? new Date(it.end).getTime() : s;
+          return e >= win.start.getTime() && s <= win.end.getTime();
+        }).length;
+        var filtered = items.get().filter(function (it) {
+          var s = new Date(it.start).getTime();
+          var e = it.end ? new Date(it.end).getTime() : s;
+          return e >= fr.start && s <= fr.end;
+        }).length;
+
+        // 时间范围卡片
+        var winSpan = win.end.getTime() - win.start.getTime();
+        var frSpan = fr.end - fr.start;
+        rangeTimeline.textContent = fmt(win.start) + "  ~  " + fmt(win.end);
+        rangeTimelineSub.textContent =
+          "跨度: " + fmtSpan(winSpan) + "  |  " + visible + " 条数据";
+
+        rangeDataZoom.textContent = fmt(fr.start) + "  ~  " + fmt(fr.end);
+        var r0 = timeline.dataZoom.filterStartRatio.toFixed(3);
+        var r1 = timeline.dataZoom.filterEndRatio.toFixed(3);
+        rangeDataZoomSub.textContent =
+          "比例: [" + r0 + ", " + r1 + "]  |  跨度: " + fmtSpan(frSpan);
+
+        status.innerHTML =
+          "可见 item: " +
+          visible +
+          " / " +
+          items.length +
+          "  |  过滤后 item: " +
+          filtered;
+      }
+
+      timeline.on("rangechanged", updateStatus);
+      timeline.on("rangechange", updateStatus);
+      timeline.body.emitter.on("datazoomfilterchange", updateStatus);
+      updateStatus();
+
+      // 运行时切换选项
+      function applyDataZoomOptions(patch) {
+        var cur = timeline.options.dataZoom || {};
+        timeline.setOptions({ dataZoom: Object.assign({}, cur, patch) });
+      }
+
+      document
+        .getElementById("toggleFilter")
+        .addEventListener("change", function (e) {
+          applyDataZoomOptions({ filterData: e.target.checked });
+        });
+      document
+        .getElementById("toggleScroll")
+        .addEventListener("change", function (e) {
+          applyDataZoomOptions({ zoomOnScroll: e.target.checked });
+        });
+      document
+        .getElementById("toggleLabels")
+        .addEventListener("change", function (e) {
+          applyDataZoomOptions({ showLabels: e.target.checked });
+        });
+      document
+        .getElementById("selPos")
+        .addEventListener("change", function (e) {
+          applyDataZoomOptions({ position: e.target.value });
+        });
+      document
+        .getElementById("btnReset")
+        .addEventListener("click", function () {
+          timeline.dataZoom.filterStartRatio = 0;
+          timeline.dataZoom.filterEndRatio = 1;
+          timeline.dataZoom._renderWindow();
+          timeline.body.emitter.emit("datazoomfilterchange");
+        });
+      document
+        .getElementById("btnDisable")
+        .addEventListener("click", function () {
+          applyDataZoomOptions({ enabled: false });
+        });
+      document
+        .getElementById("btnEnable")
+        .addEventListener("click", function () {
+          applyDataZoomOptions({ enabled: true });
+        });
+    </script>
+  </body>
+</html>

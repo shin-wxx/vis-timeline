@@ -1,0 +1,330 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Timeline | DataZoom 性能测试</title>
+    <style>
+      body,
+      html {
+        font-family: sans-serif;
+      }
+      #controls {
+        margin: 10px 0;
+        padding: 8px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+      }
+      #perfLog {
+        margin: 10px 0;
+        padding: 10px;
+        background: #1e1e1e;
+        color: #0f0;
+        font-family: monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        border-radius: 4px;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      #rangePanel {
+        display: flex;
+        gap: 12px;
+        margin: 10px 0;
+      }
+      .range-card {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.8;
+      }
+      .range-card .range-title {
+        font-weight: bold;
+        font-size: 12px;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+      }
+      .range-card .range-value {
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .range-timeline {
+        background: #e3f2fd;
+        border: 1px solid #90caf9;
+      }
+      .range-timeline .range-title {
+        color: #1565c0;
+      }
+      .range-datazoom {
+        background: #fff3e0;
+        border: 1px solid #ffcc80;
+      }
+      .range-datazoom .range-title {
+        color: #e65100;
+      }
+      .range-sub {
+        font-size: 11px;
+        color: #666;
+      }
+    </style>
+    <script src="../../standalone/umd/vis-timeline-graph2d.js"></script>
+    <link
+      href="../../styles/vis-timeline-graph2d.css"
+      rel="stylesheet"
+      type="text/css"
+    />
+  </head>
+  <body>
+    <h2>Timeline · DataZoom 性能测试</h2>
+    <div id="controls">
+      <label
+        >数据量:
+        <select id="selCount">
+          <option value="1000">1,000</option>
+          <option value="5000">5,000</option>
+          <option value="10000" selected>10,000</option>
+          <option value="50000">50,000</option>
+        </select>
+      </label>
+      <button id="btnGen">生成数据 & 初始化</button>
+      <button id="btnTestPan">测试平移 (10次)</button>
+      <button id="btnTestZoomOut">测试缩小 (10次)</button>
+      <button id="btnTestZoomIn">测试放大 (10次)</button>
+      <button id="btnTestFilter">测试拖动选窗 (10次)</button>
+      <button id="btnClearLog">清空日志</button>
+    </div>
+    <div id="rangePanel">
+      <div class="range-card range-timeline">
+        <div class="range-title">Timeline 可见窗口</div>
+        <div class="range-value" id="rangeTimeline">-</div>
+        <div class="range-sub" id="rangeTimelineSub">-</div>
+      </div>
+      <div class="range-card range-datazoom">
+        <div class="range-title">DataZoom 选窗</div>
+        <div class="range-value" id="rangeDataZoom">-</div>
+        <div class="range-sub" id="rangeDataZoomSub">-</div>
+      </div>
+    </div>
+    <div id="perfLog"></div>
+    <div id="visualization"></div>
+
+    <script type="text/javascript">
+      var timeline = null;
+      var items = null;
+      var perfLog = document.getElementById("perfLog");
+
+      function log(msg) {
+        var ts = new Date().toISOString().slice(11, 23);
+        perfLog.textContent =
+          "[" + ts + "] " + msg + "\n" + perfLog.textContent;
+      }
+
+      function fmt(d) {
+        return new Date(d).toISOString().slice(0, 16).replace("T", " ");
+      }
+
+      function updateRangeDisplay() {
+        if (!timeline || !timeline.dataZoom) return;
+        var win = timeline.getWindow();
+        var fr = timeline.dataZoom.getFilterRange();
+        document.getElementById("rangeTimeline").textContent =
+          fmt(win.start) + " ~ " + fmt(win.end);
+        document.getElementById("rangeTimelineSub").textContent =
+          "跨度: " + ((win.end - win.start) / 86400000).toFixed(1) + " 天";
+        document.getElementById("rangeDataZoom").textContent =
+          fmt(fr.start) + " ~ " + fmt(fr.end);
+        document.getElementById("rangeDataZoomSub").textContent =
+          "比例: [" +
+          timeline.dataZoom.filterStartRatio.toFixed(3) +
+          ", " +
+          timeline.dataZoom.filterEndRatio.toFixed(3) +
+          "]";
+      }
+
+      document
+        .getElementById("btnClearLog")
+        .addEventListener("click", function () {
+          perfLog.textContent = "";
+        });
+
+      document.getElementById("btnGen").addEventListener("click", function () {
+        var count = parseInt(document.getElementById("selCount").value);
+        log("生成 " + count + " 条数据...");
+        var t0 = performance.now();
+
+        items = new vis.DataSet();
+        var start = new Date("2020-01-01").getTime();
+        var end = new Date("2025-12-31").getTime();
+        var span = end - start;
+        for (var i = 0; i < count; i++) {
+          var t = start + (span * i) / count;
+          var isRange = i % 5 === 0;
+          items.add({
+            id: i,
+            content: "item " + i,
+            start: new Date(t),
+            end: isRange ? new Date(t + 5 * 86400000) : undefined,
+            type: isRange ? "range" : "box",
+          });
+        }
+        var t1 = performance.now();
+        log("数据生成: " + (t1 - t0).toFixed(1) + "ms");
+
+        if (timeline) {
+          timeline.destroy();
+        }
+        t0 = performance.now();
+        timeline = new vis.Timeline(
+          document.getElementById("visualization"),
+          items,
+          {
+            min: "2020-01-01",
+            max: "2025-12-31",
+            start: "2025-06-01",
+            end: "2025-12-31",
+            height: "350px",
+            stack: true,
+            zoomable: true,
+            moveable: true,
+            dataZoom: {
+              enabled: true,
+              height: 50,
+              filterData: true,
+              zoomOnScroll: true,
+              showLabels: true,
+            },
+          },
+        );
+        t1 = performance.now();
+        log("Timeline 初始化: " + (t1 - t0).toFixed(1) + "ms");
+
+        timeline.on("rangechange", updateRangeDisplay);
+        timeline.on("rangechanged", updateRangeDisplay);
+        timeline.body.emitter.on("datazoomfilterchange", updateRangeDisplay);
+        updateRangeDisplay();
+      });
+
+      // 测试平移
+      document
+        .getElementById("btnTestPan")
+        .addEventListener("click", function () {
+          if (!timeline) return;
+          log("=== 平移测试开始 ===");
+          var total = 0;
+          var win = timeline.getWindow();
+          var span = win.end.getTime() - win.start.getTime();
+          var step = span * 0.05;
+
+          for (var i = 0; i < 10; i++) {
+            var t0 = performance.now();
+            timeline.setWindow(
+              new Date(win.start.getTime() + step * (i + 1)),
+              new Date(win.end.getTime() + step * (i + 1)),
+              { animation: false },
+            );
+            var t1 = performance.now();
+            total += t1 - t0;
+          }
+          log(
+            "平移 10 次: " +
+              total.toFixed(1) +
+              "ms (avg " +
+              (total / 10).toFixed(1) +
+              "ms)",
+          );
+          updateRangeDisplay();
+        });
+
+      // 测试缩小
+      document
+        .getElementById("btnTestZoomOut")
+        .addEventListener("click", function () {
+          if (!timeline) return;
+          log("=== 缩小测试开始 ===");
+          var total = 0;
+
+          for (var i = 0; i < 10; i++) {
+            var win = timeline.getWindow();
+            var span = win.end.getTime() - win.start.getTime();
+            var t0 = performance.now();
+            timeline.setWindow(
+              new Date(win.start.getTime() - span * 0.2),
+              new Date(win.end.getTime() + span * 0.2),
+              { animation: false },
+            );
+            var t1 = performance.now();
+            total += t1 - t0;
+          }
+          log(
+            "缩小 10 次: " +
+              total.toFixed(1) +
+              "ms (avg " +
+              (total / 10).toFixed(1) +
+              "ms)",
+          );
+          updateRangeDisplay();
+        });
+
+      // 测试放大
+      document
+        .getElementById("btnTestZoomIn")
+        .addEventListener("click", function () {
+          if (!timeline) return;
+          log("=== 放大测试开始 ===");
+          var total = 0;
+
+          for (var i = 0; i < 10; i++) {
+            var win = timeline.getWindow();
+            var span = win.end.getTime() - win.start.getTime();
+            var center = (win.start.getTime() + win.end.getTime()) / 2;
+            var t0 = performance.now();
+            timeline.setWindow(
+              new Date(center - span * 0.3),
+              new Date(center + span * 0.3),
+              { animation: false },
+            );
+            var t1 = performance.now();
+            total += t1 - t0;
+          }
+          log(
+            "放大 10 次: " +
+              total.toFixed(1) +
+              "ms (avg " +
+              (total / 10).toFixed(1) +
+              "ms)",
+          );
+          updateRangeDisplay();
+        });
+
+      // 测试拖动选窗
+      document
+        .getElementById("btnTestFilter")
+        .addEventListener("click", function () {
+          if (!timeline || !timeline.dataZoom) return;
+          log("=== 拖动选窗测试开始 ===");
+          var dz = timeline.dataZoom;
+          var total = 0;
+
+          for (var i = 0; i < 10; i++) {
+            dz.filterStartRatio = 0.1 + i * 0.03;
+            dz.filterEndRatio = 0.9 - i * 0.03;
+            var t0 = performance.now();
+            dz._renderWindow();
+            timeline.body.emitter.emit("datazoomfilterchange");
+            var t1 = performance.now();
+            total += t1 - t0;
+          }
+          log(
+            "拖动选窗 10 次: " +
+              total.toFixed(1) +
+              "ms (avg " +
+              (total / 10).toFixed(1) +
+              "ms)",
+          );
+          updateRangeDisplay();
+        });
+    </script>
+  </body>
+</html>

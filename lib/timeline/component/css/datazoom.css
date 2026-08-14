@@ -1,0 +1,139 @@
+.vis-data-zoom-container {
+  position: relative;
+  width: 100%;
+  height: 40px;
+  padding: 4px 0;
+  box-sizing: border-box;
+  user-select: none;
+  /* 补偿父级 .vis-panel.vis-bottom 的 1px 左右 border 与主时间轴网格线容器
+     (.vis-panel.vis-background.vis-vertical，无 border) 的宽度差异。
+     两者左边缘已对齐（content area 同源），但 bottom 面板内容区比 bgVert 窄 2px
+     （左右 border 各 1px）。向右扩展 2px 使轨道与 bgVert 等宽，确保
+     _toScreen 映射的 [0, centerWidth] 与轨道像素宽度一致，避免右侧刻度被裁剪。 */
+  margin-right: -2px;
+  width: calc(100% + 2px);
+}
+
+.vis-data-zoom-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #f0f2f5;
+  /* 用 inset box-shadow 代替 border：border 会占用 1px 布局空间，使 track 内容
+     区比主时间轴窄 2px，导致刻度线在水平方向与主轴错位。box-shadow 不占布局，
+     track 内容区与主轴等宽，刻度即可像素级对齐。 */
+  box-shadow: inset 0 0 0 1px #d9d9d9;
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.vis-data-zoom-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+/* ---- 网格线（对齐 timeaxis.css .vis-grid.vis-vertical）---- */
+.vis-data-zoom-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid;
+}
+
+.vis-data-zoom-grid.vis-minor {
+  border-color: #e5e5e5;
+}
+
+.vis-data-zoom-grid.vis-major {
+  border-color: #bfbfbf;
+}
+
+/* ---- 文字标签（对齐 timeaxis.css .vis-text）---- */
+.vis-data-zoom-text {
+  position: absolute;
+  bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 0 2px;
+  font-size: 9px;
+}
+
+.vis-data-zoom-text.vis-minor {
+  color: #999;
+}
+
+.vis-data-zoom-text.vis-major {
+  color: #666;
+  font-weight: 600;
+}
+
+.vis-data-zoom-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(26, 115, 232, 0.12);
+  border: 1px solid rgba(26, 115, 232, 0.5);
+  border-radius: 2px;
+  cursor: grab;
+  transition: background 0.15s;
+}
+
+.vis-data-zoom-window:hover {
+  background: rgba(26, 115, 232, 0.2);
+}
+
+.vis-data-zoom-dragging .vis-data-zoom-window {
+  cursor: grabbing;
+  background: rgba(26, 115, 232, 0.25);
+}
+
+.vis-data-zoom-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: #1a73e8;
+  border-radius: 2px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.vis-data-zoom-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 12px;
+  background: #fff;
+  border-radius: 1px;
+}
+
+.vis-data-zoom-handle-left {
+  left: -4px;
+}
+
+.vis-data-zoom-handle-right {
+  right: -4px;
+}
+
+/* ---- Item 强调/弱化（DataZoom 过滤选区视觉区分）----
+   选区内 item 强化：box 外层 2px 黄色光晕（实心环 + 柔和扩散）；
+   选区外 item 弱化：透明度 70%。 */
+.vis-item.vis-data-zoom-emphasis {
+  box-shadow:
+    0 0 0 2px #1a73e8,
+    0 0 6px rgba(26, 115, 232, 0.7);
+  z-index: 3;
+}
+
+.vis-item.vis-data-zoom-dim {
+  opacity: 0.7;
+}
